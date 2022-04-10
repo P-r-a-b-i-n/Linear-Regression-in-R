@@ -1,0 +1,181 @@
+---
+title: "Linear Regression"
+author: "Prabin Kharel"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+####Linear regression on "mtcars" data
+
+Let 'mpg' be the dependant variable and the rest of the variable be independent variables. Let's call this linear regression model as "lrm".
+
+```{r}
+#linear regression model
+lrm <- lm(mpg~., data=mtcars)
+
+#Getting summary of the model
+summary(lrm)
+```
+Let's check for multicollinearity and remove the variables that introduce multicollinearity in our data. Generally, variables with VIF(Variance Inflation Factor) greater than 10 are discarded.
+
+```{r}
+#install.packages("car")
+library(car)
+# Loading required package: carData
+vif(lrm)
+```
+Since, there are variables with vif greater than 10, we need to remove it. But we won't remove all the variables with VIF > 10 at once, but we will do it one ofter the other. It is because those variables can have lesser VIF once the highest VIF variable is discarded.
+
+```{r}
+#removing the variable with highest vif (i.e, disp)
+lrm1 <- lm(mpg~ cyl+hp+drat+wt+qsec+vs+am+gear+carb, data = mtcars)
+summary(lrm1)
+```
+```{r}
+#checking multicollinearity again to ensure there are no other variables with vif>10
+vif(lrm1)
+```
+We now have one variable "cyl" with VIF>10. Remember, we had three of them earlier. If we had removed all three then it would have resulted in loss of data as now we found out removing only two of them is okay.
+
+```{r}
+#removing the variable with highest vif (i.e, cyl)
+lrm2 <- lm(mpg~hp+drat+wt+qsec+vs+am+gear+carb, data = mtcars)
+summary(lrm2)
+```
+#### Multiple Linear regression and validation using training and testing set
+Now, that we know that removing "disp" and "cyl" solves the multicollinearity issue we form a dataframe that is rid of these variables and split it into training and testing data.
+```{r}
+mt_cars <- mtcars[,-c(2,3)]
+str(mt_cars)
+```
+#####Splitting data into training and testing sets
+```{r}
+#setting seed
+set.seed(1234)
+
+#splitting data into training and testing set
+ind <- sample(2,nrow(mt_cars), replace=T, prob = c(0.7,0.3))
+head(train_data <- mt_cars[ind==1,])
+head(test_data <- mt_cars[ind==2,])
+```
+#Training the model
+```{r}
+#loading required library
+library(caret)
+
+#fitting multiple linear regression in Training set
+
+lm1 <- train(mpg~hp+drat+wt+qsec+vs+am+gear+carb, data = train_data, method="lm")
+lm1
+```
+#####Prediction on testing data
+```{r}
+#Making predictions on test data with regression model done on train data
+predict_test <- predict(lm1, newdata = test_data)
+predict_test
+```
+#####Error Metrics
+```{r}
+#Checking the errors in predicted data
+R2 <- R2(predict_test,test_data$mpg)
+RMSE <- RMSE(predict_test,test_data$mpg)
+MAE <- MAE(predict_test,test_data$mpg)
+R2
+RMSE
+MAE
+```
+
+####Leave One Out Cross-Validation (LOOCV:
+#####Training the model
+```{r}
+set.seed(1234)
+train_control_1 <- trainControl(method="LOOCV")
+lm2 <- train(mpg~hp+drat+wt+qsec+vs+am+gear+carb, data = train_data, method="lm", trControl= train_control_1)
+lm2
+```
+
+#####Making Predictions on test data
+```{r}
+#predictions on test data with regression model done on train data using LOOCV method
+predict_test_1 <- predict(lm2,newdata = test_data)
+predict_test_1
+```
+#####Error Metrics
+```{r}
+R2 <- R2(predict_test_1,test_data$mpg)
+RMSE <- RMSE(predict_test_1,test_data$mpg)
+MAE <-MAE(predict_test_1,test_data$mpg)
+R2
+
+RMSE
+
+MAE
+
+```
+
+####k-folds cross validation
+#####Training the model
+```{r}
+#we need to state the method as "cv" to use cross-validation control
+set.seed(1234)
+train_control_2 <- trainControl(method = "cv", number=10)
+lm3 <- train(mpg~hp+drat+wt+qsec+vs+am+gear+carb,data= train_data, method="lm", trControl=train_control_2)
+lm3
+```
+
+#####Prediction on testing set
+```{r}
+#making predictions on test data with cross validation as train control method
+predict_test_2 <- predict(lm3,newdata = test_data)
+predict_test_2
+```
+
+#####Error metrics
+```{r}
+#Checking errors in prediction
+R2 <-R2(predict_test_2,test_data$mpg)
+RMSE <-RMSE(predict_test_2,test_data$mpg)
+MAE <- MAE(predict_test_2,test_data$mpg)
+R2
+
+RMSE
+
+MAE
+```
+
+####k-folds cross validation with repeats
+#####Training the model
+```{r}
+set.seed(1234)
+train_control_3 <-trainControl(method = "repeatedcv", number=10,repeats=3)
+lm4 <-train(mpg~hp+drat+wt+qsec+vs+am+gear+carb, data=train_data, method="lm",trControl=train_control_3)
+lm4
+```
+
+#####Prediction on testing set
+```{r}
+#predicting on test data with 10-folds cross validation with 3 repeats
+predict_test_3 <- predict(lm4, newdata = test_data)
+predict_test_3
+```
+
+
+#####Error Metrics
+
+```{r}
+#Checking errors on prediction with 10 folds cross validation with 3 repeats 
+R2 <-R2(predict_test_3,test_data$mpg)
+RMSE <- RMSE(predict_test_3,test_data$mpg)
+MAE <- MAE(predict_test_3,test_data$mpg)
+R2
+
+RMSE
+
+MAE
+
+```
+For a better model, we select those models with higher R-squared error and lower Root Mean Squared Error. Among the models we created, the linear regession model with 1o folds cross validation has the highest R-squared value and lower RMSE . So, 10-folds cross validation is our best model.
+
+
